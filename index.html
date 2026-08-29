@@ -1,97 +1,155 @@
-Predicting Content Decline: A Refresh Prioritization Study
-Can a Logistic Regression model beat a simple visibility + staleness rule at flagging content for refresh?
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predicting Content Decline: A Refresh Prioritization Study</title>
+<style>
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    line-height: 1.6;
+    color: #222;
+    background: #fdfdfb;
+  }
+  h1 { font-size: 2em; margin-bottom: 0.1em; }
+  h2 {
+    margin-top: 2em;
+    border-bottom: 2px solid #333;
+    padding-bottom: 6px;
+  }
+  .subtitle { color: #555; font-style: italic; margin-top: 0; }
+  .abstract {
+    background: #f4f4ef;
+    border-left: 4px solid #555;
+    padding: 16px 20px;
+    margin: 20px 0;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+  }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  th { background: #eee; }
+  img {
+    max-width: 100%;
+    display: block;
+    margin: 20px auto;
+    border: 1px solid #ddd;
+  }
+  code {
+    background: #eee;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-family: monospace;
+  }
+  ul { margin-top: 4px; }
+  footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid #ccc;
+    font-size: 0.9em;
+    color: #555;
+  }
+  a { color: #2a5db0; }
+</style>
+</head>
+<body>
 
-Abstract. This study asks whether a Logistic Regression model can better identify high-visibility, declining content pages than a simple rule-based baseline (impressions + staleness thresholds). Using an anonymized 30,000-row content-performance dataset, a Logistic Regression model was trained on 23 numeric features and compared against the baseline on identical train/test splits. Under a standard random split, the model showed higher accuracy (0.644 vs 0.599) and precision, while the baseline retained higher recall (0.822 vs 0.7175); under a fairer, client-grouped split, both methods performed only modestly above the base rate (~0.58 vs ~0.51), showing the initial gap was partly a split artifact. The result is directional, not conclusive — useful as a way to rank content for human review, not to trigger automatic action. The output is a ranked REFRESH/REVIEW/NO_ACTION playbook intended to support, not replace, human editorial decisions.
-1. Introduction / Problem Statement
-Research Question: I want to know if a logistic regression model, trained on content signals can reliably predict which high‑visibility pages are at risk of performance decline. And whether it can beat a simple rule‑based baseline that uses impressions plus staleness thresholds to flag pages for refresh.
+<h1>Predicting Content Decline: A Refresh Prioritization Study</h1>
+<p class="subtitle">Can a Logistic Regression model beat a simple visibility + staleness rule at flagging content for refresh?</p>
 
-Decision it supports: The decision it supports is about which pages, in a content library should be prioritized for refresh versus left. It turns visibility and staleness data into a ranked action list that shows REFRESH, REVIEW or NO_ACTION for each page.
+<div class="abstract">
+<strong>Abstract.</strong> This study asks whether a Logistic Regression model can better identify high-visibility, declining content pages than a simple rule-based baseline (impressions + staleness thresholds). Using an anonymized 30,000-row content-performance dataset, a Logistic Regression model was trained on 23 numeric features and compared against the baseline on identical train/test splits. Under a standard random split, the model showed higher accuracy (0.644 vs 0.599) and precision, while the baseline retained higher recall (0.822 vs 0.7175); under a fairer, client-grouped split, both methods performed only modestly above the base rate (~0.58 vs ~0.51), showing the initial gap was partly a split artifact. The result is directional, not conclusive — useful as a way to rank content for human review, not to trigger automatic action. The output is a ranked REFRESH/REVIEW/NO_ACTION playbook intended to support, not replace, human editorial decisions.
+</div>
 
-2. Data
-Primary dataset: content_refresh_anonymized.csv. This is the FlyRank ML Internship dataset with 30,000 rows and 44 columns. It contains content-performance data that was used to build the decline-prediction model using Logistic Regression, as well as its rule-based baseline.
+<h2>1. Introduction / Problem Statement</h2>
+<p>Research Question: I want to know if a logistic regression model, trained on content signals can reliably predict which high‑visibility pages are at risk of performance decline. And whether it can beat a simple rule‑based baseline that uses impressions plus staleness thresholds to flag pages for refresh.</p>
+<p>Decision it supports: The decision it supports is about which pages, in a content library should be prioritized for refresh versus left. It turns visibility and staleness data into a ranked action list that shows REFRESH, REVIEW or NO_ACTION for each page.</p>
 
-Also explored: The FlyRank Warehouse Dataset (available on Hugging Face, gated production release) was used during Weeks 3 and 4 for exploratory aggregation and feature exploration at scale. However this dataset was not used in the trained model presented in this paper.
+<h2>2. Data</h2>
+<p>Primary dataset: content_refresh_anonymized.csv. This is the FlyRank ML Internship dataset with 30,000 rows and 44 columns. It contains content-performance data that was used to build the decline-prediction model using Logistic Regression, as well as its rule-based baseline.</p>
+<p>Also explored: The FlyRank Warehouse Dataset (available on Hugging Face, gated production release) was used during Weeks 3 and 4 for exploratory aggregation and feature exploration at scale. However this dataset was not used in the trained model presented in this paper.</p>
+<p>What was excluded and why: The features trend_direction and trend_pct were excluded from the model. These features directly reflect the outcome being predicted. The decline. So including them would result in label leakage. They were kept to create the decline label, for verification purposes not for training.</p>
+<p>Safe note: No client names, URLs or raw private queries appear in the dataset. All fields have been fully anonymized.</p>
 
-What was excluded and why: The features trend_direction and trend_pct were excluded from the model. These features directly reflect the outcome being predicted. The decline. So including them would result in label leakage. They were kept to create the decline label, for verification purposes not for training.
+<h2>3. Methodology</h2>
+<p>Assumptions: A page is considered to be declining when it shows signs of visibility together with low recent engagement or freshness. This follows the logic as the rule-based baseline but the model uses a larger set of features instead of just two fixed variables.</p>
+<p>Features: The model uses 23 columns from the dataset, such as search_volume, competition, cpc, word_count, impressions_90d, clicks_90d, pageviews_90d, sessions_90d, days_since_last_update, ctr, avg_position, engagement_rate, ai_traffic_pct and others. These columns are all numeric. Remain after leakage columns were removed. Unlike the baseline, which relies on two hand‑picked signals the model can see the entire non‑leaking numeric feature space.</p>
+<p>Label definition: The label is_declining equals 1 when trend_direction is 'down' otherwise it equals 0. The columns trend_direction and trend_pct were removed from the feature set because they are used to create the label and not as inputs. Including them would cause label leakage.</p>
+<p>Leakage columns removed: trend_direction, trend_pct impressions_last_30d, clicks_last_30d, sessions_last_30d, impressions_prev_30d, clicks_prev_30d, sessions_prev_30d. These columns overlap numerically with the window used to build the label.</p>
+<p>Baseline: A rule‑based approach. If impressions_90d is greater than 81 and days_since_last_update is least 51 then the page is classified as HIGH_VISIBILITY_STALE and is marked for REFRESH. Other combinations of conditions are mapped to REVIEW or NO_ACTION.</p>
+<p>Model: Logistic Regression. The model is trained using the 23‑feature set described earlier.</p>
+<p>Validation design: Initially, an 80/20 stratified train/test split was used, stratified by the label but not aware of time or groups. Later a client‑grouped split was applied as a check as described in Section 4.</p>
+<p>Leakage checks: First the trend and window columns were removed after noticing that accuracy rose when they were kept. Second a further set of suspect 90‑day columns—impressions_90d, sessions_90d, clicks_90d, pageviews_90d, users_90d, engaged_sessions_90d—was tested under the grouped split. They were. The accuracy was measured again. The accuracy changed by than one point from 0.583, to 0.578. This shows that these columns are not providing a hidden shortcut so they were kept in the feature set.</p>
 
-Safe note: No client names, URLs or raw private queries appear in the dataset. All fields have been fully anonymized.
+<h2>4. Results (vs Baseline)</h2>
+<p><strong>Stratified 80/20 split:</strong></p>
+<table>
+<tr><th>Method</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th></tr>
+<tr><td>Baseline (rule-based)</td><td>0.599</td><td>0.594</td><td>0.822</td><td>0.690</td></tr>
+<tr><td>Logistic Regression</td><td>0.644</td><td>0.657</td><td>0.7175</td><td>0.686</td></tr>
+</table>
+<img src="random_split_comparison.png" alt="Random split: Model vs Baseline comparison chart">
+<p>Logistic Regression showed higher accuracy than the baseline under a stratified random split, with similar precision between the two. The baseline still had higher recall (0.822 vs 0.7175) — meaning it finds more true decline cases, though it also produces more false alarms. The F1 scores for both methods are nearly identical.</p>
 
-3. Methodology
-Assumptions: A page is considered to be declining when it shows signs of visibility together with low recent engagement or freshness. This follows the logic as the rule-based baseline but the model uses a larger set of features instead of just two fixed variables.
+<p><strong>Grouped-by-client split</strong> (test. Stops leakage from the same clients rows appearing in both train and test):</p>
+<table>
+<tr><th>Split variant</th><th>Base rate</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th></tr>
+<tr><td>With suspect 90-day-total features</td><td>0.511</td><td>0.583</td><td>0.592</td><td>0.589</td><td>0.590</td></tr>
+<tr><td>Without suspect 90-day-total features</td><td>0.511</td><td>0.578</td><td>0.588</td><td>0.583</td><td>0.585</td></tr>
+</table>
+<img src="grouped_split_comparison.png" alt="Grouped split: With vs Without suspect features comparison chart">
+<p>When evaluated with a grouped split the accuracy went down from about 0.64 to about 0.58. The accuracy is about 7 to 8 points above the base rate of about 0.51. This is not a settled result. It comes from one dataset and one split method. Neither the model nor the baseline is ready to make decisions. Both perform better as a way to highlight content for check. They are not good, for making decisions on their own.</p>
 
-Features: The model uses 23 columns from the dataset, such as search_volume, competition, cpc, word_count, impressions_90d, clicks_90d, pageviews_90d, sessions_90d, days_since_last_update, ctr, avg_position, engagement_rate, ai_traffic_pct and others. These columns are all numeric. Remain after leakage columns were removed. Unlike the baseline, which relies on two hand‑picked signals the model can see the entire non‑leaking numeric feature space.
+<h2>5. Limitations & Honest Framing</h2>
+<p>Data artifact: eighty percent of the rows have only three different staleness values, measured by days since last update. This pattern probably comes from how the dataset was made or anonymized, not from content behavior. Because of that staleness alone cannot be relied on as a signal.</p>
+<p>Split sensitivity: The results were good when we used a random 80/20 split. However they fell near the base rate when we used a grouped split. This shows that random splits can make performance look better than it really is when the rows are not independent.</p>
+<p>Single dataset, single run: All the numbers come from just one anonymized dataset called content_refresh_anonymized.csv which has 30,000 rows. One train/test setup was used. Because we did not run cross-validation on splits or other datasets the results are only a guide, not a final answer.</p>
+<p>Feature-set asymmetry: The baseline model uses two signals, impressions_90d and days_since_last_update. The other model uses twenty-three features. Still the model only looks at columns. It does not use signals like content_type, main_intent, provider_used or deeper behavioral history. Therefore there is probably predictive information that we have not used yet.</p>
+<p>No causal claim: This study only shows a link between visibility or staleness and decline. It does not say that refreshing a page will make performance better. It also does not try to mimic or reverse-engineer a search engines ranking algorithm.</p>
+<p>Decision-support only: Because the improvement, over the baseline is small and depends on how the split's done this information should help a human reviewer decide what to prioritize. It should not be used to trigger refresh actions.</p>
 
-Label definition: The label is_declining equals 1 when trend_direction is 'down' otherwise it equals 0. The columns trend_direction and trend_pct were removed from the feature set because they are used to create the label and not as inputs. Including them would cause label leakage.
+<h2>6. Ranked Recommendations</h2>
+<p>The rule (unchanged from baseline): visibility (impressions_90d) is the confirmed decline driver; staleness (days_since_last_update) is a mixed, non-monotonic signal, used only as a secondary tiebreaker among high-visibility content.</p>
+<table>
+<tr><th>Visibility</th><th>Staleness</th><th>Reason code</th><th>Action</th></tr>
+<tr><td>High (&gt;81 impressions)</td><td>Old (≥51 days)</td><td>HIGH_VISIBILITY_STALE</td><td>REFRESH</td></tr>
+<tr><td>High (&gt;81 impressions)</td><td>Fresh (&lt;51 days)</td><td>HIGH_VISIBILITY_FRESH</td><td>REVIEW</td></tr>
+<tr><td>Low (≤81 impressions)</td><td>—</td><td>LOW_VISIBILITY</td><td>NO_ACTION</td></tr>
+</table>
+<p>Ranking within each reason code is by impressions_90d (score) — highest-traffic items surface first, since that's where a fix or missed opportunity matters most. On this snapshot: 36.65% REFRESH, 63.35% REVIEW (30,000 rows, base decline rate 0.5421).</p>
+<p>Archetype note: REFRESH concentrates almost entirely in "keyword article" (91% of the dataset). Smaller content types (comparison article, feedly article) get few or zero REFRESH picks in this snapshot — read this as where the queue currently concentrates effort, not as a claim that other types never need refreshing.</p>
+<p>Decay insight: Decline rate by staleness bucket is non-monotonic (dips at 21–50 days, peaks at 51–104, dips again at 105+), and days_since_last_update is dominated by just 3 repeated values (~80% of rows) — a pattern more consistent with a data artifact than measured content age. This is why staleness is used only as a tiebreaker, never the primary driver.</p>
+<p><strong>Human review checklist</strong> before acting on any REFRESH/REVIEW pick:</p>
+<ul>
+<li>Does days_since_last_update match actual CMS edit history? (given the repeated-value artifact, don't take it at face value)</li>
+<li>Is this evergreen/reference content that doesn't need updating regardless of score?</li>
+<li>Is the traffic a one-off spike that will settle on its own?</li>
+<li>Is one outlier client skewing the picture?</li>
+</ul>
+<p><strong>What should never be automated:</strong> auto-publishing content changes, permanently deprioritizing LOW_VISIBILITY items, treating the reason code as a diagnosis of why something is declining, or extending the thresholds (81 impressions, 51 days) to a new client/dataset without re-validating.</p>
+<p><strong>Monitoring triggers:</strong> re-check base rate drift, re-run the visibility/staleness threshold checks periodically, watch for the repeated-value staleness artifact changing shape, and watch for the REFRESH/REVIEW/NO_ACTION split moving sharply away from ~27%/48%/25% — any of these is a signal to redo the signal-check → rule → validation cycle, not to keep scoring with old cutoffs.</p>
 
-Leakage columns removed: trend_direction, trend_pct impressions_last_30d, clicks_last_30d, sessions_last_30d, impressions_prev_30d, clicks_prev_30d, sessions_prev_30d. These columns overlap numerically with the window used to build the label.
+<h2>Reproducibility</h2>
+<p>All code, notebooks, and data-processing steps behind this paper are available in the project repository:</p>
+<ul>
+<li>Repository: <a href="https://github.com/Ayesha-Shahzadkhan/flyrank-assignment1">github.com/Ayesha-Shahzadkhan/flyrank-assignment1</a></li>
+<li>Full pipeline (capstone notebook): <code>work/notebooks/capstone.ipynb</code></li>
+</ul>
+<p>The dataset used (content_refresh_anonymized.csv) is anonymized and referenced from the FlyRank ML Internship program; it is not redistributed in this repository.</p>
 
-Baseline: A rule‑based approach. If impressions_90d is greater than 81 and days_since_last_update is least 51 then the page is classified as HIGH_VISIBILITY_STALE and is marked for REFRESH. Other combinations of conditions are mapped to REVIEW or NO_ACTION.
+<footer>
+<p><strong>Acknowledgments &amp; Data Credit</strong><br>
+Built on the <a href="https://flyrank.ai" target="_blank" rel="noopener">FlyRank ML Internship dataset</a>. This research was conducted as part of the FlyRank Search Intelligence internship track; all data used has been anonymized in accordance with the program's data-sharing terms.</p>
+</footer>
 
-Model: Logistic Regression. The model is trained using the 23‑feature set described earlier.
-
-Validation design: Initially, an 80/20 stratified train/test split was used, stratified by the label but not aware of time or groups. Later a client‑grouped split was applied as a check as described in Section 4.
-
-Leakage checks: First the trend and window columns were removed after noticing that accuracy rose when they were kept. Second a further set of suspect 90‑day columns—impressions_90d, sessions_90d, clicks_90d, pageviews_90d, users_90d, engaged_sessions_90d—was tested under the grouped split. They were. The accuracy was measured again. The accuracy changed by than one point from 0.583, to 0.578. This shows that these columns are not providing a hidden shortcut so they were kept in the feature set.
-
-4. Results (vs Baseline)
-Stratified 80/20 split:
-
-Method	Accuracy	Precision	Recall	F1
-Baseline (rule-based)	0.599	0.594	0.822	0.690
-Logistic Regression	0.644	0.657	0.7175	0.686
-Random split: Model vs Baseline comparison chart
-Logistic Regression showed higher accuracy than the baseline under a stratified random split, with similar precision between the two. The baseline still had higher recall (0.822 vs 0.7175) — meaning it finds more true decline cases, though it also produces more false alarms. The F1 scores for both methods are nearly identical.
-
-Grouped-by-client split (test. Stops leakage from the same clients rows appearing in both train and test):
-
-Split variant	Base rate	Accuracy	Precision	Recall	F1
-With suspect 90-day-total features	0.511	0.583	0.592	0.589	0.590
-Without suspect 90-day-total features	0.511	0.578	0.588	0.583	0.585
-Grouped split: With vs Without suspect features comparison chart
-When evaluated with a grouped split the accuracy went down from about 0.64 to about 0.58. The accuracy is about 7 to 8 points above the base rate of about 0.51. This is not a settled result. It comes from one dataset and one split method. Neither the model nor the baseline is ready to make decisions. Both perform better as a way to highlight content for check. They are not good, for making decisions on their own.
-
-5. Limitations & Honest Framing
-Data artifact: eighty percent of the rows have only three different staleness values, measured by days since last update. This pattern probably comes from how the dataset was made or anonymized, not from content behavior. Because of that staleness alone cannot be relied on as a signal.
-
-Split sensitivity: The results were good when we used a random 80/20 split. However they fell near the base rate when we used a grouped split. This shows that random splits can make performance look better than it really is when the rows are not independent.
-
-Single dataset, single run: All the numbers come from just one anonymized dataset called content_refresh_anonymized.csv which has 30,000 rows. One train/test setup was used. Because we did not run cross-validation on splits or other datasets the results are only a guide, not a final answer.
-
-Feature-set asymmetry: The baseline model uses two signals, impressions_90d and days_since_last_update. The other model uses twenty-three features. Still the model only looks at columns. It does not use signals like content_type, main_intent, provider_used or deeper behavioral history. Therefore there is probably predictive information that we have not used yet.
-
-No causal claim: This study only shows a link between visibility or staleness and decline. It does not say that refreshing a page will make performance better. It also does not try to mimic or reverse-engineer a search engines ranking algorithm.
-
-Decision-support only: Because the improvement, over the baseline is small and depends on how the split's done this information should help a human reviewer decide what to prioritize. It should not be used to trigger refresh actions.
-
-6. Ranked Recommendations
-The rule (unchanged from baseline): visibility (impressions_90d) is the confirmed decline driver; staleness (days_since_last_update) is a mixed, non-monotonic signal, used only as a secondary tiebreaker among high-visibility content.
-
-Visibility	Staleness	Reason code	Action
-High (>81 impressions)	Old (≥51 days)	HIGH_VISIBILITY_STALE	REFRESH
-High (>81 impressions)	Fresh (<51 days)	HIGH_VISIBILITY_FRESH	REVIEW
-Low (≤81 impressions)	—	LOW_VISIBILITY	NO_ACTION
-Ranking within each reason code is by impressions_90d (score) — highest-traffic items surface first, since that's where a fix or missed opportunity matters most. On this snapshot: 36.65% REFRESH, 63.35% REVIEW (30,000 rows, base decline rate 0.5421).
-
-Archetype note: REFRESH concentrates almost entirely in "keyword article" (91% of the dataset). Smaller content types (comparison article, feedly article) get few or zero REFRESH picks in this snapshot — read this as where the queue currently concentrates effort, not as a claim that other types never need refreshing.
-
-Decay insight: Decline rate by staleness bucket is non-monotonic (dips at 21–50 days, peaks at 51–104, dips again at 105+), and days_since_last_update is dominated by just 3 repeated values (~80% of rows) — a pattern more consistent with a data artifact than measured content age. This is why staleness is used only as a tiebreaker, never the primary driver.
-
-Human review checklist before acting on any REFRESH/REVIEW pick:
-
-Does days_since_last_update match actual CMS edit history? (given the repeated-value artifact, don't take it at face value)
-Is this evergreen/reference content that doesn't need updating regardless of score?
-Is the traffic a one-off spike that will settle on its own?
-Is one outlier client skewing the picture?
-What should never be automated: auto-publishing content changes, permanently deprioritizing LOW_VISIBILITY items, treating the reason code as a diagnosis of why something is declining, or extending the thresholds (81 impressions, 51 days) to a new client/dataset without re-validating.
-
-Monitoring triggers: re-check base rate drift, re-run the visibility/staleness threshold checks periodically, watch for the repeated-value staleness artifact changing shape, and watch for the REFRESH/REVIEW/NO_ACTION split moving sharply away from ~27%/48%/25% — any of these is a signal to redo the signal-check → rule → validation cycle, not to keep scoring with old cutoffs.
-
-Reproducibility
-All code, notebooks, and data-processing steps behind this paper are available in the project repository:
-
-Repository: github.com/Ayesha-Shahzadkhan/flyrank-assignment1
-Full pipeline (capstone notebook): work/notebooks/capstone.ipynb
-The dataset used (content_refresh_anonymized.csv) is anonymized and referenced from the FlyRank ML Internship program; it is not redistributed in this repository.
-
-Acknowledgments & Data Credit
-Built on the FlyRank ML Internship dataset. This research was conducted as part of the FlyRank Search Intelligence internship track; all data used has been anonymized in accordance with the program's data-sharing terms
+</body>
+</html>
