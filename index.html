@@ -67,7 +67,7 @@
 <p class="subtitle">Can a Logistic Regression model beat a simple visibility + staleness rule at flagging content for refresh?</p>
 
 <div class="abstract">
-<strong>Abstract.</strong> I set out to compare a simple hand-written rule against a Logistic Regression model to see which one does a better job flagging content pages for refresh. The rule marks a page as high-priority (REFRESH) when it has more than 80 impressions in the last 90 days and hasn't been updated in over 51 days; everything else falls into REVIEW or NO_ACTION. The LR model uses 23 features instead of just two, and after fixing a data leakage issue, its accuracy came out almost identical to the rule's. The result is directional — useful for ranking content, not for making final calls on its own.
+<strong>Abstract.</strong> I set out to compare a simple hand-written rule against a Logistic Regression model to see which one does a better job flagging content pages for refresh. The rule marks a page as high-priority (REFRESH) when it has more than 81 impressions in the last 90 days and hasn't been updated in atleast 51 days; everything else falls into REVIEW or NO_ACTION. The LR model uses 23 features instead of just two, and after fixing a data leakage issue, its accuracy came out almost identical to the rule's. The result is directional — useful for ranking content, not for making final calls on its own.
 </div>
 
 <h2>1. Introduction / Problem Statement</h2>
